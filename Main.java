@@ -8,12 +8,22 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+
+/*TODO:
+   Add a button to save the file
+    Cursorlist
+    debugging
+    file text links
+    History stack
+    Back Button Functionality
+ */
 
 public class Main extends Application {
 
@@ -22,24 +32,53 @@ public class Main extends Application {
     public static void main(String[] args) {
 //        System.out.println(checkStructureValidity(readFromFile(new File("file1.242"))));
         String content = readFromFile(new File("file1.242"));
-        String [] Expressions = getExpresions(content);
-        String [] results = postFix(Expressions);
-        for (int i = 0; i < results.length; i++){
-            System.out.println(results[i]);
-        }
+        String results = postFixAll(content);
+//        String [] Expressions = getExpresions(content);
+//        String results = postFix(Expressions);
+        System.out.println(results);
 
-        String equation = "1+2/5*(3+5)*4";
-        String fixedEq = postFix(equation);
-        System.out.println(fixedEq);
-//        launch(args);
+//        String equation = "11 + 2 / 5 * ( 3 + 5 ) * 4"; //test expression (has to have spaces) //TODO add spaces if there isn't
+//        String fixedEq = postFix(equation);
+        String equation = "5 + 13 + 2 * 3";
+//        System.out.println(fixedEq);
+//        String fixedEq = postFix(equation);
+//        System.out.println(fixedEq);
+        launch(args);
     }
     //method that takes in the array of expressions and returns an array of them with a postfix notation for each
-    public static String[] postFix(String[] expressions){
-        String[] postFix = new String[expressions.length];
+    public static String postFixAll (String content){
+        String[] expressions = getExpresions(content);
+        if (getExpresions(content) == null){
+            return content;//"No equations found";
+        }
+        String postFix = "";
         for (int i = 0; i < expressions.length; i++){ //goes through each expression
-            postFix[i] = postFix(expressions[i]); // and converts it to postfix notation
+            if(expressions[i] != null){
+                postFix += postFix(expressions[i]); // and converts it to postfix notation and adds it to a single string
+                postFix += "\n"; //adds a new line after each expression
+            }
         }
         return postFix; //returns the array of postfix expressions
+    }
+    //method that extracts the list of files from a .242 file content as a string
+    private static String getFiles(String content) {
+        if (!checkStructureValidity(content)) {
+            return "Invalid file structure!";
+        }
+        String files = ""; //adds files here with new line seperator
+        String[] lines = content.split("\n");
+        if (!content.contains("<files>")) { //if no tags then there are no referenced files in the opened file
+            return "No files found!";
+        }
+        for (int i = 0; i < lines.length; i++) { //loops over the content of the opened file which is has each tag and the content following it put in its own line
+            if (lines[i].equals("<files>") && lines[i+1].equals("</files") ){ //if the i+1 points to the end tag then there are no files
+                return "No files found!";
+            }
+            if (lines[i].equals("<file>") /*&& i + 1 < lines.length */ && !lines[i + 1].equals("</file>")) {//structure validation method assures the middle case (commented out case)
+                files += lines[i + 1] + "\n";
+            }
+        }
+        return files;
     }
     //method to read the file and return the string with each tag and the content after displayed in a line
     private static String readFromFile(File file) {
@@ -53,7 +92,8 @@ public class Main extends Application {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        content = content.replaceAll("\\s", ""); //removes all the white spaces
+        content = content.replaceAll("\\s+", " ");//removes all spaces but a single " " from string content
+//        content = content.replaceAll("\\s", ""); //removes all the white spaces
         StringBuilder sb = new StringBuilder(); //makes a string builder to be able to append a new line after each tag to make it easer to find them
 
         for (int i = 0; i < content.length(); i++) {
@@ -63,6 +103,13 @@ public class Main extends Application {
             else if (content.charAt(i) == '>') { //adds a line after a tag
                 sb.append(">");
                 sb.append("\n");
+                try {
+                    if (content.charAt(i+1) == ' ') { //if there is a space after the tag, it will skip it
+                        i++;
+                    }
+                } catch (Exception e) {
+//                    e.printStackTrace();
+                }
             }
             else if (content.charAt(i) == '<') { //adds a line before a tag
                 sb.append("\n");
@@ -84,8 +131,13 @@ public class Main extends Application {
                 sb.append("\n"); //adding a new line after each line
             }
         }
-
-        System.out.println(sb.toString());
+//        if (getFiles(sb.toString()) != null) { //if there are files referenced in the opened file
+//            String[] files = getFiles(sb.toString()).split("\n"); //splitting the files into an array
+//            for (int i = 0; i < files.length; i++) { //looping through the files
+//                sb.append(readFromFile(new File(files[i]))); //adding the content of each file to the string builder
+//            }
+//        }//Not how the project works
+//        System.out.println(sb.toString());
         return sb.toString(); //converting the string builder to a string and returning it
     }
     //method that extracts only the expression from the string and returns them as an array of expressions
@@ -99,45 +151,28 @@ public class Main extends Application {
         for (int i = 0; i < contentArray.length; i++){ //looping through the array of the content to find "<equation> tag and closing tag (since the structure is valid)
             if (contentArray[i].equals("<equation>")){ //if found the tag pair, it adds the line in between to the expression array list
                 if (contentArray[i+2].equals("</equation>")){
-                    expressions.add(contentArray[i+1]); //the expression is stored in one line since the readFromFile method removes all the white spaces
+                    if(!checkExpressionValidity(contentArray[i+1])) { //checks if the expression is valid
+                        expressions.add(contentArray[i+1]); //if it is not valid then it is added as null to the array list
+                        continue; //continues to the next iteration
+                    }
+                    StringBuilder sbToAddSpaces = new StringBuilder(contentArray[i+1].replaceAll("\\s", "")); //removing all the spaces from the expression
+                    for (int j = 0; j < sbToAddSpaces.length(); j++){ //looping through the string builder to add spaces between each character
+                        if (sbToAddSpaces.charAt(j) == '+' || sbToAddSpaces.charAt(j) == '-' || sbToAddSpaces.charAt(j) == '*' || sbToAddSpaces.charAt(j) == '/' || sbToAddSpaces.charAt(j) == '(' || sbToAddSpaces.charAt(j) == ')'){ //if the character is an operator or a parenthesis
+                            sbToAddSpaces.insert(j, " "); //insert a space before it
+                            sbToAddSpaces.insert(j+2, " "); //insert a space after it
+                            j+=2; //incrementing j by 2 to skip the spaces that were just added
+                        }
+                    }
+                    expressions.add((sbToAddSpaces.toString())); //the expression is stored with spaces between each character
                 }
             }
         }
         String [] expressionsArray = new String[expressions.size()]; //converting the array list to an array
-        for (int i = 0; i < expressions.size(); i++){
-            expressionsArray[i] = expressions.get(i);
+        for (int i = 0; i < expressions.size(); i++) { //going through the array list and adding each expression to the array
+                expressionsArray[i] = expressions.get(i);
         }
         return expressionsArray; //returning the array of expressions
     }
-    //method to process the string removing whitespace and placing each pair of tag beginning and ending in one line so that they are checked in a line by line basis.
-//    private static String processString(String content) {
-//        String processed = "";
-//        String[] lines = content.split("\n");
-//        for (String line : lines) {
-//            line = line.replaceAll("\\s", "");
-////            if (line.contains("<\\w") && line.contains("</")) {
-//                processed += line + "\n";
-////            }
-//        }
-//        return processed;
-//    }
-    //method to check if a string contains a tag keyword and returns an array of the tags found
-//    private static LnList findTags(String content) {
-//        LnList foundTags = new LnList(); //uses a linked list to store the tags as they are found
-//        String[] tags = {"<242>", "<equations>","<equation>", "</equation>", "</equations>", "<files>", "<file>", "</file>", "</files>", "</242>"}; //array has to be ordered for the stack to work properly (see below)
-//        for (String tag : tags) {
-//            if (!content.contains(tag)) { //if one of the tags is not found at all, the content is invalid
-//                return null;
-//            }
-//            while (content.contains(tag)) { //going over all instances of the tag
-//                foundTags.addLast(tag); //adding the tag to the list
-//                content = content.replaceFirst(tag, ""); //removing tag from original string
-//            }
-//        }
-////        foundTags.print();
-//        return foundTags; //list of all found tags
-//    }
-    //method to check if the text extracted from the file is valid
     private static boolean checkStructureValidity(String content) {
 //        boolean isValid = true;
         if (!content.contains("<242>")) {
@@ -302,14 +337,17 @@ public class Main extends Application {
     }
     //method to check the validity of the parenthesis using stack
     private static boolean checkExpressionValidity(String equation){
-        equation = equation.replaceAll("\\s", "");
-        MyStack myStack = new MyStack(equation.length());
+        for (int i =0; i < equation.length(); i++) { //going over the equation cheking if there are two consecutive numbers or variables
+            if (Character.isLetterOrDigit(equation.charAt(i)) && i < equation.length() - 2) {//if the current character is number or letter and is of 2 places away from index
+//                System.out.println(equation.charAt(i + 1) + " " + equation.charAt(i + 2));
+                if (equation.charAt(i + 1) == ' ' && Character.isLetterOrDigit(equation.charAt(i + 2))) {//then if a space follows and another number or letter
+                    return false;
+                }
+            }
+        }
+        equation = equation.replaceAll("\\s", ""); //easier to deal with without spaces
+        MyStack myStack = new MyStack(equation.length()); //using stack to check parenthesis
         for (int i = 0; i < equation.length(); i++) {
-//            if (Character.isLetterOrDigit(equation.charAt(i)) && i < equation.length() - 2){
-//                if (equation.charAt(i+1) == ' ' && Character.isLetterOrDigit(equation.charAt(i + 2))) {//found two consecutive numbers or variables without an operator in between
-//                    return false;
-//                }
-//        } //deleted since there is no space, consecutive variables or/and numbers are considered one number/variable
             if (i < equation.length() -1 && (equation.charAt(i) == '*' || equation.charAt(i) == '/' || equation.charAt(i) == '+' || equation.charAt(i) == '-' || equation.charAt(i) == '^')) {
                 if (equation.charAt(i + 1) == '*' || equation.charAt(i + 1) == '/' || equation.charAt(i + 1) == '+' || equation.charAt(i + 1) == '-' || equation.charAt(i + 1) == '^') { //found two consecutive operators
                     return false;
@@ -336,34 +374,42 @@ public class Main extends Application {
     }
     //method to convert infix to postfix of one expression using stack. It returns a string of the infix and a postfix expression with a "=>" in between
     private static String postFix(String equation) {
-        if (!checkExpressionValidity(equation)) { //checking if the parenthesis are valid
-            return equation + "=> " + "Invalid Equation"; //TODO: add to gui
+        if (!checkExpressionValidity(equation)) { //checking if the parenthesis is valid and there are no consecutive variables, numbers, or operators
+            return equation + " => " + "Invalid Equation"; //TODO: add to gui
         }
-//        String [] equationArray = equation.split("\\+|-|\\*|/|\\^");
-        equation += " "; // add a space to the end of the equation to make sure the last char is added to the stack
-        String [] equationArray = equation.split(" "); //splitting the equation into an array of numbers or/and variables and operators
-        StringBuilder postfix = new StringBuilder();//using string builder to add elements to the expression
+        String[] equationArray = equation.split(" "); //splitting the equation into an array of numbers or/and variables and operators
+        for (int i = 0; i < equationArray.length; i++) {
+            equationArray[i] = equationArray[i].trim();
+//            System.out.print(equationArray[i]+",");
+        }
+        StringBuilder postfix = new StringBuilder();
         MyStack operationStack = new MyStack(equation.length()); //stack to hold the operators
         for (int i = 0; i < equationArray.length; i++) { //looping through the array elements (numbers or/and variables and operators)
-            if (equationArray[i].equals("(")) { //if the element is an opening parenthesis, it adds to the stack
-                operationStack.push(equationArray[i]);
+            if (equationArray[i].equals("+") || equationArray[i].equals("-") || equationArray[i].equals("*") || equationArray[i].equals("/") || equationArray[i].equals("^")) {//if it encountered an operator
+                while (!operationStack.isEmpty() && checkPriorityOfOperation(equationArray[i].charAt(0)) <= checkPriorityOfOperation((char) operationStack.getTop())) { //casts to from object to string then to char //so long the top stack operator of higher or equal priority
+//                    System.out.println(operationStack.getTop()+"adding");
+                    postfix.append((char) operationStack.pop()).append(" "); //it removes that operator from the stack and adds it to the expression followed by a space
+                }
+                operationStack.push(equationArray[i].charAt(0)); //adds the operator to the stack
+            }
+            else if (equationArray[i].equals("(")) {//if the element is an opening parenthesis, it adds to the stack
+                operationStack.push('('); //pushes '(' to stack
             } else if (equationArray[i].equals(")")) {
-                while (!operationStack.getTop().equals("(")) { //adds all operations in between parenthesis to the expression so long '(' is not the top of the stack
-                    postfix.append(operationStack.pop()).append(" "); //operator followed by space
+                while ((char) operationStack.getTop() != '(') { //adds all operations in between parenthesis to the expression so long '(' is not the top of the stack
+                    postfix.append((char) operationStack.pop()).append(" "); //operator followed by space
                 }
                 operationStack.pop(); //removes the opening parenthesis
-            } else if (equationArray[i].equals("+") || equationArray[i].equals("-") || equationArray[i].equals("*") || equationArray[i].equals("/") || equationArray[i].equals("^")) {//if it encountered an operator
-                while (!operationStack.isEmpty() && (checkPriorityOfOperation((char) operationStack.getTop()) >= checkPriorityOfOperation(equationArray[i].charAt(0)))) { //so long the top stack operator of higher or equal priority
-                    postfix.append(operationStack.pop()).append(" "); //it removes that operator from the stack and adds it to the expression followed by a space
+            }
+            else { //if the element is a number or/and variable
+                postfix.append(equationArray[i]).append(" "); //add it to the expression
+            }
+            if (i == equationArray.length - 1) { //if it reached the end of the array
+                while (!operationStack.isEmpty()) { //it adds all the remaining operators in the stack to the expression
+                    postfix.append(operationStack.pop()).append(" ");
                 }
-//                if (checkPriorityOfOperation(equationArray[i].charAt(0)) > checkPriorityOfOperation((char)operationStack.getTop())){ //if the operator in the string is of higher priority than the one in the stack, it pushes it to the stack
-//                    operationStack.push(equation.charAt(i));
-//                }
-                operationStack.push(equationArray[i]); //if the operator in the string is of higher priority than the one in the stack, it pushes it to the stack
-            } else {
-                postfix.append(equationArray[i]).append(" "); //if it is a number or variable, it adds it to the expression followed by a space
             }
         }
+
 //        StringBuilder fixedEq = new StringBuilder(); //string builder to easily add chars to the string
 //        MyStack opStack = new MyStack(100);
 //        char currentChar;
@@ -386,18 +432,64 @@ public class Main extends Application {
 //            }
 //            else { //if the character is an operator
 //                while (!opStack.isEmpty() && checkPriorityOfOperation(currentChar) <= checkPriorityOfOperation((char)opStack.getTop())){ //pops into string so long the stack is not empty or the operation reached in the string is of less priority of the ones in the stack
-//                    fixedEq.append((char) opStack.pop());
+//                    fixedEq.append((char)opStack.pop());
 //                }
 //                opStack.push(currentChar); //pushes the operator to the stack
 //            }
 //        }
-        return equation + "=> " + postfix.toString(); //converting to string and returning
+        return equation + " => " + postfix.toString() + "= " + evaluate(postfix.toString()); //converting to string and returning
+    }
+    //method to evaluate a postfix expression using stack
+    private static String evaluate(String postFixed) { //Takes the postfixed expression and returns the result as a string of a float number
+        MyStack myStack = new MyStack(100);
+        String [] postFixedArray = postFixed.split(" "); //splitting the expression into an array of numbers and operators
+        float op1, op2; //the tow operands of each operation
+        for(int i = 0; i < postFixedArray.length; i++){ //goes over the array of numbers and operators
+            if (postFixedArray[i].charAt(0) == '+'){ // if it found an operator, it pops the two operand stored in stack and performs the operation
+                op2 = (float)myStack.pop(); //popping the two operands
+                op1 = (float)myStack.pop(); //operand 1 is the first to go into operation
+                myStack.push(op1+op2);
+            }
+            else if (postFixedArray[i].charAt(0) == '-'){
+                op2 = (float)myStack.pop();
+                op1 = (float)myStack.pop();
+                myStack.push(op1-op2);
+            }
+            else if (postFixedArray[i].charAt(0) == '*'){
+                op2 = (float)myStack.pop();
+                op1 = (float)myStack.pop();
+                myStack.push(op1*op2);
+            }
+            else if (postFixedArray[i].charAt(0) == '/'){
+                op2 = (float)myStack.pop();
+                op1 = (float)myStack.pop();
+                myStack.push(op1/op2);
+            }
+            else if (postFixedArray[i].charAt(0) == '^'){
+                op2 = (float)myStack.pop();
+                op1 = (float)myStack.pop();
+                myStack.push(Math.pow(op1,op2));
+            }
+            else { //if it found a number, it pushes it to the stack
+                try {
+                    myStack.push(Float.parseFloat(postFixedArray[i])); //pushing the number to the stack after parsing it to float
+                }
+                catch (NumberFormatException e){ //must be a variable
+                    System.out.println("Expression has to only have numbers!");;
+                    return "Can't evaluate";
+                }
+            }
+        }
+        return myStack.pop().toString();
     }
 
     @Override
-    public void start(Stage stage) throws Exception {
+    public void start (Stage stage) throws Exception {
         //File browser Section
-//        FileBrowser fileBrowser = new FileBrowser();
+        FileChooser fileChooser = new FileChooser(); //creating a file chooser
+        fileChooser.setTitle("Open Resource File"); //setting the title of the file chooser
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("242 Files", "*.242")); //setting the file extension filter to only show text files
+
         Button backButton = new Button("Back");
         TextField pathField = new TextField();
         pathField.setEditable(false);
@@ -438,9 +530,36 @@ public class Main extends Application {
         stage.setScene(scene);
         stage.show();
 
-        //Button Listeners
-//        browseButton.setOnAction(e -> {
-//
-//        });
+//        Button Listeners
+        browseButton.setOnAction(e -> {
+            File selectedFile = fileChooser.showOpenDialog(stage);
+            if (selectedFile != null) {
+                pathField.setText(selectedFile.getAbsolutePath());
+                String fileContent = readFromFile(selectedFile);
+                equationArea.setText(postFixAll(fileContent));
+                filesArea.setText(getFiles(fileContent));
+            }
+        });
+
+        filesArea.setOnMouseClicked(e -> {
+            String selectedFile = filesArea.getSelectedText();
+            if (selectedFile != null) {
+                File file = new File(selectedFile);
+                if (file.exists()) {
+                    String fileContent = readFromFile(file);
+                    equationArea.setText(postFixAll(fileContent));
+                    filesArea.setText(getFiles(fileContent));
+                }
+            }
+        });
     }
+//    //method to read from files referenced in the opened file
+//    private static String [] readFromFiles(String files){
+//        String [] fileNames = files.split("\n");
+//        String [] fileContent = new String[fileNames.length];
+//        for (int i = 0; i < fileNames.length; i++){
+//            fileContent[i] = readFromFile(new File(fileNames[i]));
+//        }
+//        return fileContent;
+//    }
 }

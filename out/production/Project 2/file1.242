@@ -1,8 +1,8 @@
 <242>
 	<files>
-		<file> c:\data\file2.242
+		<file>file2.242
  </file>
-		<file> c:\data\file3.242 </file>
+		<file> data/file3.242 </file>
 	</files> 
 
 	<equations>
@@ -12,6 +12,7 @@
 </equation>
 		<equation>1 + 2 + * 3</equation>
 		<equation> ( 1 + ( 2 * )</equation>
+	<equation> 5+31+2*3</equation>
 	
 	</equations>
 </242>
